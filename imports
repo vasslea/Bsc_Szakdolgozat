@@ -6,3 +6,6 @@ import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 from matplotlib import pyplot as plt
+
+import torch.nn.functional as F
+from torchsummary import summary
