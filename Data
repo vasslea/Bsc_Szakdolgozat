@@ -1,0 +1,21 @@
+# Data preprocessing
+transform = transforms.Compose([
+    transforms.RandomHorizontalFlip(),
+    transforms.RandomCrop(32, padding=4),
+    transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1), # helps generalize the model better
+    transforms.ToTensor(),
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    # Normalize the images to [-1, 1]
+])
+
+# CIFAR-10 datasets
+train_dataset = torchvision.datasets.CIFAR10(root='./data', train=True,
+                                             download=True, transform=transform)
+test_dataset = torchvision.datasets.CIFAR10(root='./data', train=False,
+                                            download=True, transform=transform)
+
+# Data loaders
+train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size,
+                          shuffle=True, num_workers=2)
+test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size,
+                         shuffle=False, num_workers=2)
