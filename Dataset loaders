@@ -1,0 +1,44 @@
+# Create dataset loaders, each corresponding to a different task for training
+trainset_loaders = []
+
+# Access targets directly from the dataset
+targets = np.array(train_dataset.targets)
+labels = np.unique(targets)
+
+num_concurrent_labels = num_classes // num_tasks
+
+# Label subsets (a form of class incremental learning). This means each task involves different classes from the CIFAR10 dataset.
+for i in range(0, num_classes, num_concurrent_labels):
+    concurrent_labels = labels[i: i + num_concurrent_labels]
+
+    concurrent_targets = np.isin(targets, concurrent_labels)
+    filtered_indices = np.where(concurrent_targets)[0]
+    train_ds_subset = torch.utils.data.Subset(train_dataset, filtered_indices)
+
+    trainset_loader = torch.utils.data.DataLoader(train_ds_subset,
+                                                  batch_size=batch_size,
+                                                  shuffle=True,
+                                                  num_workers=2)
+    trainset_loaders.append(trainset_loader)
+
+testset_loader = torch.utils.data.DataLoader(test_dataset,
+                                             batch_size=batch_size,
+                                             shuffle=False,
+                                             num_workers=2)
+
+
+# Create new train dataset loaders of random splits if hyperparameter is True
+if random_splits:
+    trainset_loaders = []
+    ds_length = len(train_dataset)
+    splits_length = ds_length // num_tasks
+    rand = np.random.permutation(len(train_dataset))
+    ds_rand_parts = torch.utils.data.random_split(train_dataset,
+                                                  [splits_length] * num_tasks,
+                                                  generator=torch.Generator().manual_seed(0))
+    for item in ds_rand_parts:
+        trainset_loader = torch.utils.data.DataLoader(item,
+                                                      batch_size=batch_size,
+                                                      shuffle=True,
+                                                      num_workers=2)
+        trainset_loaders.append(trainset_loader)
