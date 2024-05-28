@@ -1,0 +1,31 @@
+class ReplayBuffer:
+    def __init__(self, buffer_size, device="cpu"):
+        self.buffer_size = buffer_size
+        self.device = device
+        self.buffer = collections.deque(maxlen=buffer_size)
+        self.counter = 0  # Counter to track the total number of samples seen
+
+    def push(self, state, action):
+        if len(self.buffer) < self.buffer_size:
+            self.buffer.append((state, action))
+        else:
+            # Insert at a random position if the buffer is full
+            idx = random.randint(0, self.counter)
+            if idx < self.buffer_size:
+                self.buffer[idx] = (state, action)
+        self.counter += 1
+
+    def sample(self, batch_size):
+        indices = np.random.choice(len(self.buffer), batch_size, replace=False)
+        states, actions = zip(*[self.buffer[idx] for idx in indices])
+        return states, actions
+
+    def __len__(self):
+        return len(self.buffer)
+
+    def is_empty(self):
+        return len(self.buffer) == 0
+
+# Initialize Replay Buffer
+replay_buffer_capacity = 5120  
+replay_buffer = ReplayBuffer(replay_buffer_capacity, device='cuda')
