@@ -1,0 +1,39 @@
+# Function to calculate accuracy
+def get_accuracy(model_output, target, batch_size):
+    prediction = torch.max(model_output, 1)[1].view(target.size())
+    corrects = (prediction.data == target.data).sum()
+    accuracy = 100.0 * corrects / batch_size
+    return accuracy.item()
+
+# Function to evaluate model on a single test loader
+def evaluate_model_on_loader(test_loader, model, loss_function, device):
+    model.eval()
+    test_loss = 0.0
+    test_acc = 0.0
+    for i, (images, labels) in enumerate(test_loader):
+        images = images.to(device)
+        labels = labels.to(device)
+        predictions = model(images)
+        loss = loss_function(predictions, labels)
+        test_loss += loss.detach().item()
+        test_acc += get_accuracy(predictions, labels, batch_size)
+    test_loss = test_loss / (i + 1)
+    test_acc = test_acc / (i + 1)
+    return test_loss, test_acc
+
+# Function to evaluate model on all seen tasks
+def evaluate_model(model, testset_loaders, loss_function, device):
+    model.eval()
+    total_loss = 0.0
+    total_acc = 0.0
+    num_loaders = len(testset_loaders)
+
+    for test_loader in testset_loaders:
+        test_loss, test_acc = evaluate_model_on_loader(test_loader, model, loss_function, device)
+        total_loss += test_loss
+        total_acc += test_acc
+
+    avg_loss = total_loss / num_loaders
+    avg_acc = total_acc / num_loaders
+
+    return avg_loss, avg_acc
