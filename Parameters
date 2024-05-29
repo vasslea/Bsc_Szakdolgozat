@@ -1,0 +1,19 @@
+# Hyperparameters
+dataset_name = 'cifar10'
+image_size = (3, 32, 32)
+batch_size = 128
+num_classes = 10
+num_tasks = 5
+random_splits = False
+
+# Parameters
+learning_rate = 0.1  # SGD usually requires a higher learning rate than Adam
+momentum = 0.9
+weight_decay = 1e-4
+optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=weight_decay)  # SGD with momentum
+
+# Learning Rate Scheduler
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+
+loss_function = nn.CrossEntropyLoss()
+num_epochs = 20  # Increased epochs

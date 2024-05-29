@@ -1,6 +1,0 @@
-dataset_name = 'cifar10'
-image_size = (3, 32, 32)
-batch_size = 128
-num_classes = 10
-num_tasks = 5
-random_splits = False
