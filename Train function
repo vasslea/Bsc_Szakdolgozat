@@ -1,0 +1,98 @@
+device = torch.device("cuda")
+
+# Training with Experience Replay
+def train(model, trainset_loaders, testset_loaders, num_epochs, replay_buffer, batch_size, optimizer, loss_function, scheduler, device):
+
+    history = {'train_loss': [],
+               'train_accuracy': [],
+               'test_loss': [],
+               'test_accuracy': []}
+
+    print(f"Train the model on CIFAR-10 dataset for {num_tasks} x {num_epochs} epochs...\n")
+
+    # Train the model using EWC
+    lambda_ewc = 0.3 # hiperparameter [1,100] [0, 1] # 0, 0.3, 0.5, 0.7, 1, 5, 10,
+    ewc_tasks_array = [] # list to hold past task data
+
+    for task_id, train_loader in enumerate(trainset_loaders):
+        print(f"\nTraining on task: {task_id}\n")
+
+        if task_id == 0:
+            ewc_tasks = None
+
+        # If this is not the first task, create EWC from previous tasks
+        if task_id > 0:
+            # create an EWC object. This will compute Fisher Information matrix and store it inside the object
+            ewc = EWC(model, ewc_tasks, device, loss_function)
+
+        for epoch in range(num_epochs):
+            train_loss = 0.0
+            train_acc = 0.0
+            model.train()
+
+            for i, (images, labels) in enumerate(train_loader):
+                images = images.to(device)
+                labels = labels.to(device)
+
+                # Forward pass + backprop + loss calculation
+                predictions = model(images)
+                base_loss = loss_function(predictions, labels)
+
+                # -------------- EWC ------------
+                # compute EWC penalty
+                ewc_loss = 0.0
+                if task_id > 0: # if it's not the first task, include EWC loss
+                    ewc_loss = ewc.penalty(model)
+
+                # ------------- ER -------------
+                # Store experiences in replay buffer
+                for img, lbl in zip(images, labels):
+                    replay_buffer.push(img.cpu().detach(), lbl.cpu().detach())
+
+                # Sample from replay buffer more frequently in initial phases
+                replay_ratio = 3 if epoch < num_epochs // 3 else 2 if epoch < 2 * num_epochs // 3 else 1
+                replay_loss = 0.0
+                if not replay_buffer.is_empty():
+                    for _ in range(replay_ratio):
+                        replay_states, replay_actions = replay_buffer.sample(min(batch_size, len(replay_buffer)))
+                        replay_states = torch.stack(replay_states).to(device)
+                        replay_actions = torch.stack(replay_actions).to(device)
+                        replay_predictions = model(replay_states)
+                        replay_loss += loss_function(replay_predictions, replay_actions)
+
+                # Combine base loss and ewc penalty
+                total_loss = base_loss + lambda_ewc * ewc_loss + replay_loss
+
+                optimizer.zero_grad()
+                total_loss.backward()
+
+                # Gradient clipping for stability
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
+                # Update model params
+                optimizer.step()
+
+                train_loss += total_loss.detach().item()
+                train_acc += get_accuracy(predictions, labels, batch_size)
+
+            train_loss = train_loss / (i+1)
+            train_acc = train_acc / (i+1)
+            print(f"Epoch: {epoch} | Train loss: {train_loss} | Train accuracy: {train_acc}")
+
+            # Evaluate model on all seen tasks
+            test_loss, test_acc = evaluate_model(model, testset_loaders, loss_function, device)
+            print(f" \t  Test loss: {test_loss} | Test accuracy: {test_acc}")
+
+            # Add results to the history dict
+            history['train_loss'].append(train_loss)
+            history['train_accuracy'].append(train_acc)
+            history['test_loss'].append(test_loss)
+            history['test_accuracy'].append(test_acc)
+
+        # After training on each task, save a subset of the task's data for computing EWC in future tasks
+        task_sample = [train_loader.dataset[i] for i in range(len(train_loader.dataset)) if i % 10 == 0] # save every 10th sample
+        ewc_tasks_array.extend(task_sample)
+
+        ewc_tasks = torch.utils.data.DataLoader(ewc_tasks_array, batch_size=batch_size, shuffle=False)
+
+    return history
