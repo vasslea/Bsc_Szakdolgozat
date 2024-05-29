@@ -37,3 +37,6 @@ def evaluate_model(model, testset_loaders, loss_function, device):
     avg_acc = total_acc / num_loaders
 
     return avg_loss, avg_acc
+
+# Evaluate on all test loaders
+testset_loaders = [testset_loader] * num_tasks
